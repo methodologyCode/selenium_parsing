@@ -37,7 +37,7 @@ def create_list(table_rows):
 
 def writing_table_items(lists_name_price):
     for element_name_price in lists_name_price:
-        with open('data.csv', 'a') as file:
+        with open('data.csv', 'a', newline='') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerow(
                 element_name_price
@@ -48,6 +48,7 @@ def writing_table_items(lists_name_price):
 def simulate_user_screnario(browser):
     # Заходим на главную страницу.
     browser.get("https://www.nseindia.com")
+    time.sleep(16)
 
     # Листаем вниз, чтобы было видно View all
     slow_scroll_mouse(50, 10, browser)
@@ -73,12 +74,12 @@ def setup_browser():
     webdriver.Chrome(options=options)
     browser = webdriver.Chrome()
     browser.get('https://www.nseindia.com')
-    time.sleep(2)
     browser.implicitly_wait(2)
     return browser
 
 
 def navigate_to_pre_open_market(browser):
+    time.sleep(16)
     browser.delete_all_cookies()
     market_data_hover = browser.find_element(By.CSS_SELECTOR,
                                              'a#link_2')

@@ -6,8 +6,17 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def get_proxy():
-    html = requests.get('https://free-proxy-list.net/').text
+def get_session():
+    session = requests.Session()
+    session.headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; '
+                                     'x64) '
+                                     'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                     'Chrome/101.0.0.0 Safari/537.36'}
+    return session
+
+
+def get_proxy(session):
+    html = session.get('https://free-proxy-list.net/').text
     soup = BeautifulSoup(html, 'lxml')
 
     trs = soup.find('tbody').find_all('tr')
@@ -25,13 +34,9 @@ def get_proxy():
     return choice(proxies)
 
 
-def get_csrf_token_and_cookies(proxy):
+def get_csrf_token_and_cookies(proxy, session):
     url = 'https://www.maxmind.com/en/geoip2-precision-demo'
-    headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) '
-                             'AppleWebKit/537.36 (KHTML, like Gecko) '
-                             'Chrome/101.0.0.0 Safari/537.36',
-               }
-    response = requests.get(url, headers=headers, proxies=proxy)
+    response = session.get(url, proxies=proxy)
     soup = BeautifulSoup(response.text, 'html.parser')
     script = soup.find('div', id='geoip-demo').find_next_sibling('script').text
     pattern = r'window\.MaxMind\.X_CSRF_TOKEN = "(.*?)";'
@@ -45,13 +50,9 @@ def get_csrf_token_and_cookies(proxy):
     return value, cookies
 
 
-def get_ip_address(proxy):
+def get_ip_address(proxy, session):
     url = 'https://2ip.ru/'
-    headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) '
-                             'AppleWebKit/537.36 (KHTML, like Gecko) '
-                             'Chrome/101.0.0.0 Safari/537.36',
-               }
-    response = requests.get(url, headers=headers, proxies=proxy)
+    response = session.get(url, proxies=proxy)
 
     if response.status_code != HTTPStatus.OK:
         raise Exception
@@ -61,11 +62,11 @@ def get_ip_address(proxy):
     return ip_address
 
 
-def get_token(proxy):
-    csrf, cookies = get_csrf_token_and_cookies(proxy)
-    headers = {'x-csrf-token': csrf}
-    response = requests.post('https://www.maxmind.com/en/geoip2/demo/token',
-                             cookies=cookies, headers=headers, proxies=proxy)
+def get_token(proxy, session):
+    csrf, cookies = get_csrf_token_and_cookies(proxy, session)
+    session.headers['x-csrf-token'] = csrf
+    response = session.post('https://www.maxmind.com/en/geoip2/demo/token',
+                            cookies=cookies, proxies=proxy)
 
     if response.status_code != 201:
         raise Exception
@@ -74,14 +75,10 @@ def get_token(proxy):
     return token
 
 
-def get_timezone(ip_address, proxy):
+def get_timezone(ip_address, proxy, session):
     url = f"https://geoip.maxmind.com/geoip/v2.1/city/{ip_address}?demo=1"
-    headers = {'authorization': f"Bearer {get_token(proxy)}",
-               'user-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) '
-                             'AppleWebKit/537.36 (KHTML, like Gecko) '
-                             'Chrome/101.0.0.0 Safari/537.36',
-               }
-    response = requests.get(url, headers=headers, proxies=proxy)
+    session.headers['authorization'] = f"Bearer {get_token(proxy, session)}"
+    response = session.get(url, proxies=proxy)
 
     if response.status_code != HTTPStatus.OK:
         raise Exception
@@ -89,13 +86,9 @@ def get_timezone(ip_address, proxy):
     return response.json()['location']['time_zone']
 
 
-def get_regions(timezone, proxy):
-    headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) '
-                             'AppleWebKit/537.36 (KHTML, like Gecko) '
-                             'Chrome/101.0.0.0 Safari/537.36',
-               }
+def get_regions(timezone, proxy, session):
     url = 'https://gist.github.com/salkar/19df1918ee2aed6669e2'
-    response = requests.get(url, headers=headers, proxies=proxy)
+    response = session.get(url, proxies=proxy)
 
     if response.status_code != HTTPStatus.OK:
         raise Exception
@@ -118,7 +111,7 @@ def get_regions(timezone, proxy):
 
 
 def save_to_txt(timezone, regions):
-    with open('result.txt', 'w') as file:
+    with open('result.txt', 'w', encoding='UTF-8') as file:
         file.write(timezone + '\n')
         if regions:
             file.write('\n'.join(regions))
@@ -127,10 +120,10 @@ def save_to_txt(timezone, regions):
     return 'Готово'
 
 
-proxies = get_proxy()
+session = get_session()
+proxies = get_proxy(session)
 proxy = {proxies['schema']: proxies['address']}
-ip_address = get_ip_address(proxy)
-timezone = get_timezone(ip_address, proxy)
-regions = get_regions(timezone, proxy)
+ip_address = get_ip_address(proxy, session)
+timezone = get_timezone(ip_address, proxy, session)
+regions = get_regions(timezone, proxy, session)
 print(save_to_txt(timezone, regions))
-
